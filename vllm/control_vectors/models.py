@@ -165,7 +165,7 @@ class ControlVectorModelManager(AdapterModelManager):
             if layer_index in control_vector_model.control_vector_weights:
                 v.set_control_vector(
                     index,
-                    control_vector_model.control_vector_weights[layer_index] *
+                    control_vector_model.control_vector_weights[layer_index],
                     control_vector_model.scale_factor)
         return True
 

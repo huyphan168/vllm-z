@@ -83,15 +83,16 @@ class Worker(LocalOrDistributedWorkerBase):
             from vllm.utils import init_cached_hf_modules
             init_cached_hf_modules()
         self.observability_config = observability_config
-
-        # Return hidden states from target model if the draft model is an
-        # mlp_speculator
-        speculative_args = {} if speculative_config is None \
-            or (speculative_config.draft_model_config.model ==
-                model_config.model) \
-            or (speculative_config.draft_model_config.hf_config.model_type
-                not in ["medusa", "mlp_speculator", "eagle"]) \
-                    else {"return_hidden_states": True}
+        additional_args = {}
+        # mlp_speculator or the model config requests hidden states.
+        if (
+            speculative_config is not None
+            and speculative_config.draft_model_config.model != \
+                    model_config.model
+            and speculative_config.draft_model_config.hf_config.model_type in \
+                    ["medusa", "mlp_speculator", "eagle"]
+        ) or model_config.return_hidden_states:
+            additional_args["return_hidden_states"] = True
 
         ModelRunnerClass: Type[GPUModelRunnerBase] = ModelRunner
         if model_runner_cls is not None:
@@ -113,7 +114,7 @@ class Worker(LocalOrDistributedWorkerBase):
             prompt_adapter_config=prompt_adapter_config,
             control_vector_config=control_vector_config,
             observability_config=observability_config,
-            **speculative_args,
+            **additional_args,
         )
         # Uninitialized cache engine. Will be initialized by
         # initialize_cache.

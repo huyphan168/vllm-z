@@ -1475,7 +1475,7 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
             model_forward_end = torch.cuda.Event(enable_timing=True)
             model_forward_start.record()
 
-        hidden_or_intermediate_states = model_executable(
+        hidden_or_intermediate_states, intermediate_states = model_executable(
             input_ids=model_input.input_tokens,
             positions=model_input.input_positions,
             kv_caches=kv_caches,
@@ -1484,7 +1484,7 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
             **MultiModalInputs.as_kwargs(multi_modal_kwargs,
                                          device=self.device),
             **seqlen_agnostic_kwargs)
-
+        # print(hidden_or_intermediate_states)
         if (self.observability_config is not None
                 and self.observability_config.collect_model_forward_time):
             model_forward_end.record()
@@ -1540,20 +1540,23 @@ class ModelRunner(GPUModelRunnerBase[ModelInputForGPUWithSamplingMetadata]):
                                          model_forward_time)
 
         if self.return_hidden_states:
+        #TODO:vllm-x
+            intermediate_states = [state.cpu() for state in intermediate_states]
+            hidden_or_intermediate_states = torch.stack(intermediate_states, dim=1)
             # we only need to pass hidden states of most recent token
             assert model_input.sampling_metadata is not None
             indices = model_input.sampling_metadata.selected_token_indices
             if model_input.is_prompt:
                 hidden_states = hidden_or_intermediate_states.index_select(
-                    0, indices)
+                    0, indices.cpu())
                 output.prefill_hidden_states = hidden_or_intermediate_states
+                # print("prefill_hidden_states", output.prefill_hidden_states.shape)
             elif decode_meta.use_cuda_graph:
                 hidden_states = hidden_or_intermediate_states[:len(indices)]
             else:
                 hidden_states = hidden_or_intermediate_states
 
             output.hidden_states = hidden_states
-
         return [output]
 
 

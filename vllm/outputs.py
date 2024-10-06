@@ -8,6 +8,7 @@ from vllm.lora.request import LoRARequest
 from vllm.sequence import (PromptLogprobs, RequestMetrics, SampleLogprobs,
                            SequenceGroup, SequenceStatus)
 
+import torch
 
 @dataclass
 class CompletionOutput:
@@ -36,6 +37,8 @@ class CompletionOutput:
     finish_reason: Optional[str] = None
     stop_reason: Union[int, str, None] = None
     lora_request: Optional[LoRARequest] = None
+    hidden_states: List[torch.Tensor] = None
+    prompt_hidden_states: List[torch.Tensor] = None
 
     def finished(self) -> bool:
         return self.finish_reason is not None
@@ -47,8 +50,10 @@ class CompletionOutput:
                 f"cumulative_logprob={self.cumulative_logprob}, "
                 f"logprobs={self.logprobs}, "
                 f"finish_reason={self.finish_reason}, "
-                f"stop_reason={self.stop_reason})")
-
+                f"stop_reason={self.stop_reason}, "
+                 "hidden_states="
+                 f"Tensor({self.hidden_states.shape}))"
+                 if self.hidden_states is not None else "None)")
 
 @dataclass
 class EmbeddingOutput:
@@ -100,6 +105,7 @@ class RequestOutput:
         lora_request: Optional[LoRARequest] = None,
         encoder_prompt: Optional[str] = None,
         encoder_prompt_token_ids: Optional[List[int]] = None,
+        prompt_hidden_states: Optional[torch.Tensor] = None,
     ) -> None:
         self.request_id = request_id
         self.prompt = prompt
@@ -111,6 +117,7 @@ class RequestOutput:
         self.lora_request = lora_request
         self.encoder_prompt = encoder_prompt
         self.encoder_prompt_token_ids = encoder_prompt_token_ids
+        self.prompt_hidden_states = prompt_hidden_states
 
     @classmethod
     def from_seq_group(cls, seq_group: SequenceGroup) -> "RequestOutput":
@@ -145,7 +152,9 @@ class RequestOutput:
                 seq.get_cumulative_logprob() if include_logprobs else None,
                 seq.output_logprobs if include_logprobs else None,
                 SequenceStatus.get_finished_reason(seq.status),
-                seq.stop_reason) for seq in top_n_seqs
+                seq.stop_reason,
+                hidden_states=seq.hidden_states,
+                prompt_hidden_states=seq.prompt_hidden_states) for seq in top_n_seqs
         ]
 
         # Every sequence in the sequence group should have the same prompt.
@@ -166,7 +175,8 @@ class RequestOutput:
                    seq_group.metrics,
                    lora_request=seq_group.lora_request,
                    encoder_prompt=encoder_prompt,
-                   encoder_prompt_token_ids=encoder_prompt_token_ids)
+                   encoder_prompt_token_ids=encoder_prompt_token_ids,
+                   prompt_hidden_states = seq_group.prompt_hidden_states)
 
     def __repr__(self) -> str:
         return (f"RequestOutput(request_id={self.request_id}, "
@@ -178,7 +188,10 @@ class RequestOutput:
                 f"outputs={self.outputs}, "
                 f"finished={self.finished}, "
                 f"metrics={self.metrics}, "
-                f"lora_request={self.lora_request})")
+                f"lora_request={self.lora_request})"
+                "prompt_hidden_states="
+                f"Tensor({self.prompt_hidden_states.shape}))"
+                if self.prompt_hidden_states is not None else "None)")
 
 
 class EmbeddingRequestOutput:

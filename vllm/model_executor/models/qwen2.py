@@ -50,7 +50,7 @@ from vllm.sequence import IntermediateTensors, SamplerOutput
 
 from .interfaces import SupportsLoRA
 from .utils import is_pp_missing_parameter, make_layers
-
+from copy import deepcopy
 
 class Qwen2MLP(nn.Module):
 
@@ -262,6 +262,7 @@ class Qwen2Model(nn.Module):
         intermediate_tensors: Optional[IntermediateTensors] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
+        intermediate_states = []
         if get_pp_group().is_first_rank:
             if inputs_embeds is not None:
                 hidden_states = inputs_embeds
@@ -281,13 +282,16 @@ class Qwen2Model(nn.Module):
                 attn_metadata,
                 residual,
             )
+            # _hidden_states = deepcopy(hidden_states).cpu()
+            intermediate_states.append(hidden_states)
+            
         if not get_pp_group().is_last_rank:
             return IntermediateTensors({
                 "hidden_states": hidden_states,
                 "residual": residual
             })
         hidden_states, _ = self.norm(hidden_states, residual)
-        return hidden_states
+        return hidden_states, intermediate_states
 
 
 class Qwen2ForCausalLM(nn.Module, SupportsLoRA):

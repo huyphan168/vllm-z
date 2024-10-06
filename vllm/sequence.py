@@ -351,6 +351,8 @@ class Sequence:
         lora_request: Optional[LoRARequest] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
         from_decoder_prompt: bool = True,
+        hidden_states: List[torch.Tensor] = None,
+        prompt_hidden_states: Optional[torch.Tensor] = None,
     ) -> None:
         self.seq_id = seq_id
         self.inputs = inputs
@@ -361,7 +363,8 @@ class Sequence:
         self.from_decoder_prompt = from_decoder_prompt
         self._prompt: Optional[str] = None
         self._prompt_token_ids: Optional[List[int]] = None
-
+        self.hidden_states = hidden_states
+        self.prompt_hidden_states = prompt_hidden_states
         # For decoder-only models, a Sequence is constructed
         # from an LLMInputs instance (the `inputs` arg.)
         #
@@ -596,6 +599,7 @@ class SequenceGroup:
         encoder_seq: Optional[Sequence] = None,
         trace_headers: Optional[Mapping[str, str]] = None,
         prompt_adapter_request: Optional[PromptAdapterRequest] = None,
+        prompt_hidden_states: Optional[torch.Tensor] = None,
         control_vector_request: Optional[ControlVectorRequest] = None,
     ) -> None:
         self.request_id = request_id
@@ -618,6 +622,7 @@ class SequenceGroup:
         self.control_vector_request = control_vector_request
         self.encoder_seq = encoder_seq
         self.trace_headers = trace_headers
+        self.prompt_hidden_states = prompt_hidden_states
 
     @property
     def prompt(self) -> Optional[str]:
@@ -1005,6 +1010,8 @@ class CompletionSequenceGroupOutput(
     samples: List[SequenceOutput]
     # Prompt logprob for each prompt query token.
     prompt_logprobs: Optional[PromptLogprobs]
+    prompt_hidden_states: List[torch.Tensor] = None
+    hidden_state: List[torch.Tensor] = None
 
     def __repr__(self) -> str:
         return (f"CompletionSequenceGroupOutput(samples={self.samples}, "
